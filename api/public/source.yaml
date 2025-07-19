@@ -1,0 +1,216 @@
+openapi: 3.0.0
+info:
+  title: Dreeze Source API
+  version: v1alpha1
+  description: API for managing data sources in Dreeze
+paths:
+  /organizations/{organizationId}/sources:
+    get:
+      operationId: list_sources
+      summary: List all sources in an organization
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organization identifier
+      responses:
+        '200':
+          description: List of sources
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sources:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Source'
+        '404':
+          description: Organization not found
+    post:
+      operationId: create_source
+      summary: Create a new source in an organization
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organization identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Source'
+      responses:
+        '201':
+          description: Source created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        '404':
+          description: Organization not found
+  /organizations/{organizationId}/sources/{sourceId}:
+    get:
+      operationId: get_source
+      summary: Get a specific source in an organization
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organization identifier
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Source identifier
+      responses:
+        '200':
+          description: Source details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        '404':
+          description: Source or organization not found
+    put:
+      operationId: update_source
+      summary: Update a source in an organization
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organization identifier
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Source identifier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Source'
+      responses:
+        '200':
+          description: Source updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        '404':
+          description: Source or organization not found
+    delete:
+      operationId: delete_source
+      summary: Delete a source in an organization
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organization identifier
+        - name: sourceId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Source identifier
+      responses:
+        '204':
+          description: Source deleted successfully
+        '404':
+          description: Source or organization not found
+components:
+  schemas:
+    Source:
+      type: object
+      required: [id, name, config]
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the source
+        name:
+          type: string
+          description: Human-readable name for the source
+        config:
+          oneOf:
+            - $ref: '#/components/schemas/AwsConfig'
+            # Future: - $ref: '#/components/schemas/GcpConfig'
+            # Future: - $ref: '#/components/schemas/AzureConfig'
+    AwsConfig:
+      type: object
+      required: [management_account_id]
+      properties:
+        management_account_id:
+          type: string
+          description: AWS account ID that manages the source
+          pattern: '^[0-9]{12}$'
+        filters:
+          type: object
+          properties:
+            account_ids:
+              type: array
+              items:
+                type: string
+                pattern: '^[0-9]{12}$'
+              description: List of AWS account IDs to include
+            regions:
+              type: array
+              items:
+                type: string
+                pattern: '^[a-z0-9-]+$'
+              description: List of AWS regions to include
+            organizational_units:
+              type: array
+              items:
+                type: string
+              description: List of AWS organizational unit IDs to include
+        scan_tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScanTool'
+          description: List of scan tools to use for this source
+    ScanTool:
+      type: object
+      required: [type, configuration]
+      properties:
+        type:
+          type: string
+          enum: [aws_assume_role]
+          description: Type of scan tool
+          # Future: enum: [aws_assume_role, gcp_service_account, azure_sp]
+        configuration:
+          oneOf:
+            - $ref: '#/components/schemas/AwsAssumeRoleConfig'
+            # Future: - $ref: '#/components/schemas/GcpServiceAccountConfig'
+            # Future: - $ref: '#/components/schemas/AzureServicePrincipalConfig'
+    AwsAssumeRoleConfig:
+      type: object
+      required: [role_arn]
+      properties:
+        role_arn:
+          type: string
+          pattern: '^arn:aws:iam::[0-9]{12}:role/.+'
+          description: ARN of the IAM role to assume in target accounts
+        external_id:
+          type: string
+          description: Optional external ID for assume role (recommended for security)
+        session_name:
+          type: string
+          description: Optional custom session name for AssumeRole API
+        permissions_boundary_check:
+          type: boolean
+          default: false
+          description: Whether to validate permissions boundaries before assuming 
