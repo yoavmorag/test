@@ -1,0 +1,39 @@
+@router.{{ http_method }}("{{ path }}"{% if response_model %}, response_model={{ response_model }}{% endif %}{% if status_code != 200 %}, status_code={{ status_code }}{% endif %})
+def {{ operation_id }}(
+{%- for param in path_params %}
+    {{ param.name }}: {{ param.type }},
+{%- endfor %}
+{%- if request_model %}
+    {{ service_name }}_data: {{ request_model }},
+{%- endif %}
+    service: {{ service_name | title }}Service = Depends(get_{{ service_name }}_service),
+) -> {% if response_model %}{{ response_model }}{% else %}None{% endif %}:
+    """{{ summary }}"""
+{% if http_method == "get" and path_params|length == 1 %}
+    return service.list_{{ service_name }}s({{ path_params[0].name }})
+{% elif http_method == "get" and path_params|length == 2 %}
+    result = service.get_{{ service_name }}({{ path_params[0].name }}, {{ path_params[1].name }})
+    if not result:
+        raise HTTPException(status_code=404, detail="{{ service_name | title }} not found")
+    return result
+{% elif http_method == "post" %}
+    try:
+        return service.create_{{ service_name }}({{ path_params[0].name }}, {{ service_name }}_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+{% elif http_method == "put" %}
+{% if path_params|length >= 2 %}
+    if {{ service_name }}_data.id != {{ path_params[1].name }}:
+        raise HTTPException(status_code=400, detail="ID in body must match path parameter")
+{% endif %}
+    result = service.update_{{ service_name }}({{ path_params[0].name }}, {{ path_params[1].name }}, {{ service_name }}_data)
+    if not result:
+        raise HTTPException(status_code=404, detail="{{ service_name | title }} not found")
+    return result
+{% elif http_method == "delete" %}
+    success = service.delete_{{ service_name }}({{ path_params[0].name }}, {{ path_params[1].name }})
+    if not success:
+        raise HTTPException(status_code=404, detail="{{ service_name | title }} not found")
+{% else %}
+    raise HTTPException(status_code=501, detail="Not implemented")
+{% endif %}
